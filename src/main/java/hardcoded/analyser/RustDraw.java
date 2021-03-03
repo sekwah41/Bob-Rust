@@ -38,6 +38,16 @@ public class RustDraw {
 	private void test0(Rectangle screen, BufferedImage raster) {
 		anr.analyse(screen);
 		
+		
+//		String text = "";
+//		for(RColor r : anr.getColorButtons()) {
+//			Color c = r.getColor();
+//			text += String.format("%d, %d, %d\n", c.getRed(), c.getGreen(), c.getBlue());
+//		}
+//		System.out.println(text);
+//		
+//		if(true) return;
+		
 		robot.setAutoDelay(10);
 		
 		System.out.println("RustDraw: start");
@@ -50,7 +60,7 @@ public class RustDraw {
 		sleep(50);
 		
 		setBrushShape(Shape.STRONG_HALO);
-		setBrushSize(0);
+		setBrushSize(1);
 		setBrushOpacity(6);
 		
 		sleep(200);
@@ -99,7 +109,6 @@ public class RustDraw {
 		}
 		
 		int skip = 2;
-		// RColor last_rc = null;
 		for(RColor r : bag) {
 			setBrushColor(r);
 			for(int y = 0; y < raster.getHeight(); y += skip) {
@@ -112,8 +121,32 @@ public class RustDraw {
 						continue;
 					}
 					
-					// TODO: Correct monitor!
-					doClick(new Point(x, y));
+					int len = 0;
+					for(int j = x; j < raster.getWidth(); j++) {
+						RColor rcc = getClosest(new Color(raster.getRGB(j, y)));
+						if(!color.equals(rcc)) {
+							len = j - x;
+							break;
+						}
+					}
+					
+					// Make sure we draw on the correct monitor
+					{
+						robot.mouseMove(x, y);
+						sleep(10);
+						robot.mousePress(InputEvent.BUTTON1_DOWN_MASK);
+						sleep(10);
+						robot.mouseMove(x + len, y);
+						sleep(10);
+						robot.mouseRelease(InputEvent.BUTTON1_DOWN_MASK);
+						
+						Point next = MouseInfo.getPointerInfo().getLocation();
+						if(next.x != x + len || next.y != y) {
+							throw new IllegalStateException("Mouse was moved during the execution of the program.. Pause?");
+						}
+						
+						x += len;
+					}
 				}
 			}
 		}

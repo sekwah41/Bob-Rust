@@ -29,11 +29,11 @@ import hardcoded.widget.ImageStretch;
  * 
  * @author HardCoded
  */
-public class DraggableWindow extends JPanel implements MouseListener, MouseMotionListener {
+class DraggableWindow extends JPanel implements MouseListener, MouseMotionListener {
 	private static final long serialVersionUID = 4378794890442241888L;
 	
 	// TODO: Use javafx for the more system looking file choosers. (Better UX)
-	public static void main(String[] args) {
+	public static void main0(String[] args) {
 		Locale.setDefault(Locale.US);
 		
 		JFrame frame = new JFrame("Draggable Window");

@@ -14,10 +14,6 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 
 import hardcoded.analyser.RustDraw;
-import hardcoded.main.Area;
-import hardcoded.main.DraggableWindow;
-import hardcoded.math.Point2f;
-import hardcoded.widget.ImageStretch;
 
 /**
  * Used for roughly selecting the area of the painting
@@ -57,18 +53,21 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 	
 	protected RustSettings settings = new RustSettings();
 	protected RustFileChooser fileChooser;
-	private Area area = new Area();
-	private BufferedImage image;
-	private Dimension size;
+	protected RustCanvas canvas;
+	protected Dimension size;
 	private JPanel menu;
 	
-	private BufferedImage rasterImage;
-	private ImageStretch widget;
+	private boolean minified = false;
+	private boolean show_canvas = true;
 	private boolean drawing_test;
-	
+
 	public RustWindow() {
 		size = Toolkit.getDefaultToolkit().getScreenSize();
-		init();
+		try {
+			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+		} catch(Exception e) {
+			
+		}
 		
 		setOpaque(false);
 		setLayout(null);
@@ -76,36 +75,31 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 		addMouseListener(this);
 		addMouseMotionListener(this);
 		
-		area.getPoint(0).set((size.width / 2) - 100, (size.height / 2) - 100);
-		area.getPoint(1).set((size.width / 2) + 100, (size.height / 2) - 100);
-		area.getPoint(2).set((size.width / 2) + 100, (size.height / 2) + 100);
-		area.getPoint(3).set((size.width / 2) - 100, (size.height / 2) + 100);
-		area.setRectangle(new Rectangle(8, 8, size.width - 8, size.height - 8));
-		
 		menu = new JPanel();
-		menu.setBounds(size.width - 240, 20, 220, 120);
+		menu.setBounds(size.width - 260, 20, 220, 120 + 24);
 		menu.setBackground(new Color(120, 120, 120));
 		{
 			menu.setLayout(null);
-			JLabel label = new JLabel("Image path");
+			JLabel label = new JLabel("Menu");
 			label.setForeground(Color.white);
 			label.setBounds(6, 0, 200, 24);
 			menu.add(label);
 			
 			fileChooser = new RustFileChooser(this);
 			
+			int y = 0;
 			final JButton btn_add_texture = new JButton("Set texture");
 			btn_add_texture.setFocusable(false);
 			btn_add_texture.setForeground(Color.black);
 			btn_add_texture.setBackground(Color.gray);
-			btn_add_texture.setBounds(4, 24, 212, 20);
+			btn_add_texture.setBounds(4, y += 24, 212, 20);
 			btn_add_texture.addActionListener((event) -> {
 				int result = fileChooser.showOpenDialog();
 				if(result == JFileChooser.APPROVE_OPTION) {
 					File file = fileChooser.getSelectedFile();
 					
 					try {
-						widget.setImage(ImageIO.read(file));
+						canvas.widget.setImage(ImageIO.read(file));
 					} catch(Exception e) {
 						
 					}
@@ -113,33 +107,18 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 			});
 			menu.add(btn_add_texture);
 			
-			final JButton btn_raster = new JButton("Raster Image");
-			btn_raster.setFocusable(false);
-			btn_raster.setForeground(Color.black);
-			btn_raster.setBackground(Color.gray);
-			btn_raster.setBounds(4, 48, 212, 20);
-			btn_raster.addActionListener((event) -> {
-				BufferedImage raster = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_ARGB);
-				Graphics2D g = raster.createGraphics();
-				g.clip(area.getShape());
-				widget.draw(g);
-				g.dispose();
-				rasterImage = raster;
-			});
-			menu.add(btn_raster);
-			
 			final JButton btn_reset = new JButton("Reset Texture Area");
 			btn_reset.setFocusable(false);
 			btn_reset.setForeground(Color.black);
 			btn_reset.setBackground(Color.gray);
-			btn_reset.setBounds(4, 72, 212, 20);
+			btn_reset.setBounds(4, y += 24, 212, 20);
 			btn_reset.addActionListener((event) -> {
-				widget.y_min = size.height / 2 - 50;
-				widget.y_max = size.height / 2 + 50;
-				widget.x_min = size.width / 2 - 50;
-				widget.x_max = size.width / 2 + 50;
-				widget.angle = 0;
-				widget.updatePoints();
+				canvas.widget.y_min = size.height / 2 - 50;
+				canvas.widget.y_max = size.height / 2 + 50;
+				canvas.widget.x_min = size.width / 2 - 50;
+				canvas.widget.x_max = size.width / 2 + 50;
+				canvas.widget.angle = 0;
+				canvas.widget.updatePoints();
 			});
 			menu.add(btn_reset);
 			
@@ -147,11 +126,18 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 			btn_start.setFocusable(false);
 			btn_start.setForeground(Color.black);
 			btn_start.setBackground(Color.gray);
-			btn_start.setBounds(4, 96, 212, 20);
+			btn_start.setBounds(4, y += 24, 212, 20);
 			btn_start.addActionListener((event) -> {
-				if(drawing_test) return;
-				System.out.println("Start Drawing");
+				{
+					BufferedImage raster = new BufferedImage(size.width, size.height, BufferedImage.TYPE_INT_ARGB);
+					Graphics2D g = raster.createGraphics();
+					g.clip(canvas.area.getShape());
+					canvas.widget.draw(g);
+					g.dispose();
+					canvas.rasterImage = raster;
+				}
 				
+				if(drawing_test) return;
 				drawing_test = true;
 				repaint();
 				
@@ -159,7 +145,7 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 					try {
 						Thread.sleep(100);
 						RustDraw draw = new RustDraw();
-						draw.test(getParentFrame().getBounds(), rasterImage);
+						draw.test(getParentFrame().getBounds(), canvas.rasterImage);
 						//RustGUIAnalyser test = new RustGUIAnalyser(new Robot());
 						
 						Thread.sleep(1000);
@@ -175,39 +161,31 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 			});
 			menu.add(btn_start);
 			
-			// TODO: Add chroma key and transparent pixel options.
+			final JButton btn_show_canvas = new JButton("Hide/Show Canvas");
+			btn_show_canvas.setFocusable(false);
+			btn_show_canvas.setForeground(Color.black);
+			btn_show_canvas.setBackground(Color.gray);
+			btn_show_canvas.setBounds(4, y += 24, 212, 20);
+			btn_show_canvas.addActionListener((event) -> {
+				show_canvas = !show_canvas;
+				repaint();
+			});
+			menu.add(btn_show_canvas);
+			
+			final JButton btn_about = new JButton("About");
+			btn_about.setFocusable(false);
+			btn_about.setForeground(Color.black);
+			btn_about.setBackground(Color.gray);
+			btn_about.setBounds(4, y += 24, 212, 20);
+			btn_about.addActionListener((event) -> {
+				// TODO: About popup.
+				// Fix so that the popup does not hide behind this window
+			});
+			menu.add(btn_about);
 		}
 		add(menu);
-	}
-	
-	private void init() {
-		try {
-			UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-		} catch(Exception e) {
-			
-		}
 		
-		try {
-			image = ImageIO.read(DraggableWindow.class.getResourceAsStream("/checkers.png"));
-		} catch(Exception e) {
-			
-		}
-		
-		if(image == null) {
-			// If the image fails to load
-			image = new BufferedImage(16, 16, BufferedImage.TYPE_INT_RGB);
-			Graphics2D g = image.createGraphics();
-			g.setColor(Color.magenta);
-			g.fillRect(0, 0, 8, 8);
-			g.fillRect(8, 8, 8, 8);
-		}
-		
-		widget = new ImageStretch(image);
-		widget.y_min = size.height / 2 - 50;
-		widget.y_max = size.height / 2 + 50;
-		widget.x_min = size.width / 2 - 50;
-		widget.x_max = size.width / 2 + 50;
-		widget.updatePoints();
+		canvas = new RustCanvas(this);
 	}
 	
 	private JFrame cached_parent;
@@ -230,31 +208,39 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 		g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
 		g2d.setRenderingHint(RenderingHints.KEY_DITHERING, RenderingHints.VALUE_DITHER_ENABLE);
 		
-		g2d.setColor(new Color(0, 0, 0, 64));
-		if(drawing_test) {
-			g2d.fillRect(0, 0, getWidth() - 150, getHeight());
-		} else {
+		if(minified) {
+			g2d.setColor(new Color(30, 30, 30, 100));
 			g2d.fillRect(0, 0, getWidth(), getHeight());
+		} else {
+			g2d.setColor(new Color(0, 0, 0, 64));
+			if(drawing_test) {
+				g2d.fillRect(0, 0, getWidth() - 150, getHeight());
+			} else {
+				g2d.fillRect(0, 0, getWidth(), getHeight());
+			}
 		}
 		
-		BufferedImage bi = rasterImage;
-		if(bi != null) {
-			g2d.drawImage(bi, 0, 0, null);
+		paintTaskBar(g2d);
+		
+		if(!minified) {
+			canvas.draw(g);
 		}
-		paintOverlay(g2d);
 		
 		if(drawing_test) {
-			Rectangle2D rect = area.toRectangle2D();
+			Rectangle2D rect = canvas.area.toRectangle2D();
 			g2d.clearRect((int)rect.getX(), (int)rect.getY(), (int)rect.getWidth(), (int)rect.getHeight());
 		}
-		g2d.dispose();
 		
+		if(!show_canvas && !minified) {
+			g2d.clearRect(0, 20, size.width, size.height - 20);
+		}
+		
+		if(minified) {
+			g2d.setColor(Color.black);
+			g2d.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+			g2d.drawLine(0, 20, getWidth(), 20);
+		}
 		super.paint(g);
-	}
-	
-	private void paintOverlay(Graphics2D g) {
-		paintTaskBar(g);
-		paintPoints(g);
 	}
 	
 	private void paintTaskBar(Graphics2D g) {
@@ -274,18 +260,30 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 			g.fillRect(getWidth() - 20, 0, 20, 20);
 			g.setColor(Color.white);
 			g.setStroke(new BasicStroke(2));
-			g.drawLine(getWidth() - 14, 6, getWidth() - 6, 14);
-			g.drawLine(getWidth() - 6, 6, getWidth() - 14, 14);
+			g.drawLine(getWidth() - 15, 5, getWidth() - 6, 14);
+			g.drawLine(getWidth() - 15, 14, getWidth() - 6, 5);
+		}
+		
+		{ // Minimize button
+			g.setColor(new Color(127, 80, 80));
+			g.fillRect(getWidth() - 40, 0, 20, 20);
+			g.setColor(Color.white);
+			g.setStroke(new BasicStroke(1.5f));
+			if(minified) {
+				g.drawRect(getWidth() - 36, 4, 11, 11);
+			} else {
+				g.drawLine(getWidth() - 36, 10, getWidth() - 25, 10);
+			}
 		}
 		
 		{ // Menu dropdown
 			g.setColor(new Color(80, 80, 127));
-			g.fillRect(getWidth() - 80, 0, 60, 20);
+			g.fillRect(getWidth() - 100, 0, 60, 20);
 			g.setColor(Color.white);
 			g.setStroke(new BasicStroke(1.5f));
-			g.drawLine(getWidth() - 56, 6, getWidth() - 44, 6);
-			g.drawLine(getWidth() - 56, 10, getWidth() - 44, 10);
-			g.drawLine(getWidth() - 56, 14, getWidth() - 44, 14);
+			g.drawLine(getWidth() - 76, 6, getWidth() - 64, 6);
+			g.drawLine(getWidth() - 76, 10, getWidth() - 64, 10);
+			g.drawLine(getWidth() - 76, 14, getWidth() - 64, 14);
 		}
 		
 		g.setStroke(stroke);
@@ -298,102 +296,64 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 		g.drawString(text, x, y);
 	}
 	
-	private int hover_point = -1;
-	private void paintPoints(Graphics2D g) {
-		{
-			Graphics2D copy = (Graphics2D)g.create();
-			Shape shape = area.getShape();
-			copy.setClip(shape);
-			widget.draw(copy);
-			
-			// sun.java2d.SunGraphics2D
-			{
-				Rectangle screen = getParentFrame().getBounds();
-				java.awt.geom.Area inverse = new java.awt.geom.Area(new Rectangle2D.Float(0, 0, screen.width, screen.height));
-				inverse.subtract(new java.awt.geom.Area(shape));
-				copy.setClip(inverse);
-				
-				Composite comp = AlphaComposite.getInstance(AlphaComposite.SRC, 0.3f);
-				copy.setComposite(comp);
-				widget.draw(copy);
-			}
-			copy.dispose();
-			
-			widget.drawOverlay(g);
-		}
-		
-		g.setColor(Color.white);
-		for(int i = 0; i < 4; i++) {
-			Point2f a = area.getPoint(i);
-			Point2f b = area.getPoint((i + 1) % 4);
-			
-			int x1 = (int)a.x;
-			int y1 = (int)a.y;
-			int x2 = (int)b.x;
-			int y2 = (int)b.y;
-			g.drawLine(x1, y1, x2, y2);
-		}
-		
-		{
-			g.setColor(Color.cyan);
-			for(int i = 0; i < 4; i++) {
-				int oval_size = 12;
-				if(hover_point == i) {
-					oval_size = 16;
-				}
-				
-				Point2f a = area.getPoint(i);
-				
-				int x1 = (int)a.x;
-				int y1 = (int)a.y;
-				
-				g.fillOval(x1 - oval_size / 2, y1 - oval_size / 2, oval_size, oval_size);
-			}
-		}
-	}
-	
 	private boolean isDraggingWindow;
-	private boolean isDraggingPoint;
-	private int draggedPoint;
+	private int dragOffsetX;
+	private int dragOffsetY;
 	public void mousePressed(MouseEvent e) {
 		if(e.getButton() == MouseEvent.BUTTON1) {
 			if(e.getY() < 20) {
-				if(e.getX() < getWidth() - 80) {
+				if(e.getX() < getWidth() - 100) {
 					isDraggingWindow = true;
-				} else if(e.getX() < getWidth() - 20) {
+					
+					if(minified) {
+						Point loc = getParentFrame().getLocation();
+						dragOffsetX = e.getXOnScreen() - loc.x;
+						dragOffsetY = e.getYOnScreen() - loc.y;
+					}
+				} else if(e.getX() < getWidth() - 40) {
 					menu.setVisible(!menu.isVisible());
+				} else if(e.getX() < getWidth() - 20) {
+					// Minimize
+					JFrame frame = getParentFrame();
+					Rectangle rect = Utils.getScreenSizeForPosition(e.getLocationOnScreen());
+					
+					minified = !minified;
+					if(minified) {
+						frame.setBounds(
+							rect.x + (rect.width - 540) / 2,
+							rect.y + (rect.height - 360) / 2,
+							540,
+							360
+						);
+						size.width = 540;
+						size.height = 360;
+						menu.setLocation(size.width - 260, 20);
+					} else {
+						if(rect != null && !rect.equals(frame.getBounds())) {
+							frame.setBounds(rect);
+							size = rect.getSize();
+							canvas.area.setRectangle(new Rectangle(8, 28, size.width - 8, size.height - 8));
+							menu.setLocation(size.width - 260, 20);
+						}
+					}
 				} else {
 					getParentFrame().dispose();
 				}
 			}
 		}
 		
-		if(e.getButton() == MouseEvent.BUTTON1) {
-			int index = area.getPointIndex(e.getPoint(), 12);
-			if(index != -1) {
-				isDraggingPoint = true;
-				draggedPoint = index;
-			}
-		}
-		
-		widget.onMousePressed(e);
+		if(!minified) canvas.mousePressed(e);
 	}
 	
 	public void mouseReleased(MouseEvent e) {
-		if(isDraggingPoint) {
-			area.update();
-		}
-		
 		isDraggingWindow = false;
-		isDraggingPoint = false;
-		
-		widget.onMouseRelease(e);
+		if(!minified) canvas.mouseReleased(e);
 		repaint();
 	}
 	
 	public void mouseMoved(MouseEvent e) {
 		if(e.getY() < 20) {
-			if(e.getX() < getWidth() - 80) {
+			if(e.getX() < getWidth() - 100) {
 				setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
 			} else {
 				setCursor(Cursor.getDefaultCursor());
@@ -402,21 +362,7 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 			setCursor(Cursor.getDefaultCursor());
 		}
 		
-		{
-			int hover = -1;
-			Point mouse = e.getPoint();
-			for(int i = 0; i < 4; i++) {
-				Point2f p = area.getPoint(i);
-				
-				if(mouse.distance(p.x, p.y) < 12) {
-					hover = i;
-				}
-			}
-			
-			hover_point = hover;
-		}
-		
-		widget.onMouseMove(e);
+		if(!minified) canvas.mouseMoved(e);
 	}
 	
 	public void mouseDragged(MouseEvent e) {
@@ -424,37 +370,23 @@ public class RustWindow extends JPanel implements MouseListener, MouseMotionList
 			JFrame frame = getParentFrame();
 			Rectangle rect = Utils.getScreenSizeForPosition(e.getLocationOnScreen());
 			
-			if(rect != null && !rect.equals(frame.getBounds())) {
-				frame.setBounds(rect);
-				size = rect.getSize();
-				area.setRectangle(new Rectangle(8, 8, size.width - 8, size.height - 8));
-				menu.setLocation(size.width - 240, 20);
-			}
-		}
-		
-		if(isDraggingPoint) {
-			int index = draggedPoint;
-			if(index != -1) {
-				Point2f p = area.getPoint(index);
+			if(minified) {
+				int x = e.getXOnScreen() - dragOffsetX;
+				int y = e.getYOnScreen() - dragOffsetY;
 				
-				int x = e.getX();
-				int y = e.getY();
-				if(x < 8) x = 8;
-				if(x > size.width - 8) x = size.width - 8;
-				if(y < 28) y = 28;
-				if(y > size.height - 8) y = size.height - 8;
-				
-				p.set(x, y);
-				area.update();
-				for(int i = 0; i < 4; i++) {
-					if(p == area.getPoint(i)) draggedPoint = i;
+				if(y < 0) y = 0;
+				if(y > rect.height - 20) y = rect.height - 20;
+				frame.setLocation(x, y);
+			} else {
+				if(rect != null && !rect.equals(frame.getBounds())) {
+					frame.setBounds(rect);
+					size = rect.getSize();
+					canvas.area.setRectangle(new Rectangle(8, 28, size.width - 8, size.height - 8));
+					menu.setLocation(size.width - 260, 20);
 				}
-				
-				repaint();
 			}
 		} else {
-			widget.onMouseDrag(e);
-			repaint();
+			if(!minified) canvas.mouseDragged(e);
 		}
 	}
 	

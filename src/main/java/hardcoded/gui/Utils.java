@@ -1,6 +1,7 @@
 package hardcoded.gui;
 
 import java.awt.*;
+import java.awt.geom.Rectangle2D;
 
 public final class Utils {
 	public static final Rectangle getScreenSizeForPosition(Point point) {
@@ -18,5 +19,11 @@ public final class Utils {
 		}
 		
 		return null;
+	}
+	
+	public static java.awt.geom.Area createInverse(Dimension size, Shape shape) {
+		java.awt.geom.Area inverse = new java.awt.geom.Area(new Rectangle2D.Float(0, 0, size.width, size.height));
+		inverse.subtract(new java.awt.geom.Area(shape));
+		return inverse;
 	}
 }
