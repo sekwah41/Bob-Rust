@@ -4,4 +4,4 @@ We still need to fully automate this with https://github.com/sekwah41/primitive 
 The results will get faster and higher quality re-creations as we fine-tune the code though obviously there is a limit :P
 
 ## In game
-![In game](.github/assets/screenshots/in game.jpg)
+![In game](.github/assets/screenshots/ingame.jpg)
