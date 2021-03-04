@@ -217,7 +217,7 @@ class DraggableWindow extends JPanel implements MouseListener, MouseMotionListen
 					try {
 						Thread.sleep(100);
 						RustDraw draw = new RustDraw();
-						draw.test(getParentFrame().getBounds(), IMAGE_RASTER);
+						//draw.test(getParentFrame().getBounds(), IMAGE_RASTER);
 						//RustGUIAnalyser test = new RustGUIAnalyser(new Robot());
 						
 						Thread.sleep(1000);
